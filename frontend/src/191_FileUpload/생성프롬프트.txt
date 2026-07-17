@@ -1,0 +1,67 @@
+📌https://gemini.google.com/share/d65e36559fd6
+
+FastAPI 와 React 를 사용한 프로젝트를 작성해줘
+
+[필수항목]
+  FastAPI
+  SqlAlchemy version 2 사용
+  Pydantic
+  React
+  Axios
+
+[데이터베이스에 생성될 테이블의 필드들]
+  - id : 기본키
+  - title:  업로드한 `파일의 설명`. 사용자가 직접 입력. 필수
+  - original_name: 원본 파일 이름. 필수
+  - uploaded_name: 업로드하여 저장된 파일 이름. 필수
+  - uploaded_at: 업로드된 시간. 데이터베이스 서버 시간 사용
+
+[프로젝트 구조]
+{root}/
+  ├── frontend/   # React (Vite + TypeScript)
+  └── backend/    # FastAPI (Python 3.12+)
+
+[프론트엔드]
+- React 18 + JavaScript
+- Vite 빌드 도구
+- React Router DOM
+- React Bootstrap 스타일링
+- Axios 
+
+- 폴더구조
+   src
+     ├── components/    # 필요한 component 들 
+     ├── api.js         # axios 설정
+     ├── App.jsx        
+
+- 라우팅 URL: '/'
+  - 업로드할 파일선택과 사용자가 입력할 `파일의 설명` 입력
+
+  - 업로드 버튼 누르면 업로드 처리 진행
+	- 파일 업로드 저장 처리
+	- 데이터베이스에 업로드 내역 저장
+
+  - 입력란 아래에 지금까지 업로드한 파일들의 목록 표시
+     - id, title, original_name, uploaded_name, uploaded_at
+     - 각 목록마다 '다운로드' 버튼. 다운로드 버튼 누르면 original_name 으로 다운로드 진행
+     - 업로드한 파일이 이미지 파일이면 목록에 `이미지 보기 버튼` 등장. 누르면 이미지를 팝업으로 보이기
+
+
+[백엔드]
+- FastAPI + Uvicorn
+- CORS 설정
+- 파일 구조: 
+   - controllers.py
+   - database.py
+   - models.py
+   - schemas.py
+   - main.py
+
+- 업로드된 파일명이 중복되지 않도록 rename 저장 처리
+- 업로드 파일 한개의 용량은 2M 를 초과하지 않도록 하기. 초과하면 거부하기 
+- 업로드할 경로는 설정변수로 설정하도록 함.  기본 업로드 경로는 {root}/upload 폴더 설정.
+
+
+   
+
+
