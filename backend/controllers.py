@@ -3,9 +3,10 @@
 
 import os
 import uuid
+import storage
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from models import UploadedFile
 from schemas import FileApiResponse
 from sqlalchemy import select
@@ -64,17 +65,9 @@ router = APIRouter(prefix="/api/files", tags=["files"])
 
 # ---------------------------------------------------------------------------
 # 설정 변수 (Configuration)
-# : 업로드 경로 및 제한 용량 (2MB)
+# : 제한 용량 (2MB). 실제 저장 위치(local 디스크 / S3)는 storage.py 가 담당합니다.
 # ---------------------------------------------------------------------------
-# - UPLOAD_DIR: 프로젝트 루트 하위의 'upload' 폴더를 절대 경로로 계산하여 지정합니다.
-# - MAX_FILE_SIZE: 업로드 가능한 최대 파일 용량을 바이트(Byte) 단위로 정의합니다. (2MB = 2 * 1024 * 1024)
-UPLOAD_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "upload"
-)
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
-
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
 
 
 @router.post("/upload", response_model=FileApiResponse)
@@ -95,13 +88,11 @@ async def upload_file(
     # 2. 파일명 중복 방지를 위한 Rename 처리
     ext = os.path.splitext(file.filename)[1]  # 파일 확장자
     unique_filename = f"{uuid.uuid4().hex}{ext}" # 고유한 파일명 생성
-    file_path = os.path.join(UPLOAD_DIR, unique_filename) # 저장될 파일경로
 
-    # 3. 로컬 서버에 파일 저장
+    # 3. 저장소에 파일 저장 (STORAGE_BACKEND=local -> 로컬 디스크 / s3 -> S3 버킷)
     try:
-        with open(file_path, "wb") as f:
-            content = await file.read()  # UploadFile 객체는 async 함수에서는 비동기로 동작?
-            f.write(content)
+        content = await file.read()  # UploadFile 객체는 async 함수에서는 비동기로 동작?
+        storage.save_file(unique_filename, content)
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"파일 저장 중 오류가 발생했습니다: {str(e)}"
@@ -145,14 +136,18 @@ def download_file(file_id: int, db: Session = Depends(get_db)):
             status_code=404, detail="파일을 찾을 수 없습니다."
         )
 
-    file_path = os.path.join(UPLOAD_DIR, db_file.uploaded_name)
-    if not os.path.exists(file_path):
+    if not storage.file_exists(db_file.uploaded_name):
         raise HTTPException(
             status_code=404, detail="서버에 실제 파일이 존재하지 않습니다."
         )
 
+    # local: 서버에 저장된 파일을 직접 스트리밍
+    # s3: 클라이언트를 S3 임시 서명 URL로 리다이렉트하여 서버를 거치지 않고 바로 다운로드
+    if storage.STORAGE_BACKEND == "s3":
+        return RedirectResponse(url=storage.get_presigned_url(db_file.uploaded_name))
+
     return FileResponse(
-        path=file_path,
+        path=storage.get_local_path(db_file.uploaded_name),
         filename=db_file.original_name,
         media_type="application/octet-stream",
     )
@@ -174,16 +169,15 @@ def view_file(file_id: int, db: Session = Depends(get_db)):
             status_code=404, detail="파일을 찾을 수 없습니다."
         )
 
-    file_path = os.path.join(UPLOAD_DIR, db_file.uploaded_name)
-
-    # 물리적인 파일 존재 여부 재검증
-    file_path = os.path.join(UPLOAD_DIR, db_file.uploaded_name)
-    if not os.path.exists(file_path):
+    # 물리적인 파일 존재 여부 검증
+    if not storage.file_exists(db_file.uploaded_name):
         raise HTTPException(
             status_code=404, detail="서버에 실제 파일이 존재하지 않습니다."
         )
 
+    # local: filename= 매개변수를 제외하고 전송하여 브라우저가 인라인 스트리밍으로 렌더링하게 만듭니다
+    # s3: S3 임시 서명 URL로 리다이렉트 (브라우저가 직접 S3에서 이미지를 받아옴)
+    if storage.STORAGE_BACKEND == "s3":
+        return RedirectResponse(url=storage.get_presigned_url(db_file.uploaded_name))
 
-    # filename= 매개변수를 제외하고 전송함으로써 브라우저가 다운로드 창을 띄우지 않고 
-    # 파일 자체를 인라인 스트리밍 형태로 읽어가게(렌더링하게) 만듭니다    
-    return FileResponse(path=file_path)
+    return FileResponse(path=storage.get_local_path(db_file.uploaded_name))

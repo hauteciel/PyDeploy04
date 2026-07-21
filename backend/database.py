@@ -8,15 +8,18 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "3306")
 DB_NAME = os.getenv("DB_NAME")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")  # development | production
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 # 1. 데이터베이스 연결 설정 (Database URL)
+# dev: localhost MySQL / prod: RDS 엔드포인트 (.env 의 DB_HOST 로 전환)
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # 2. SQLAlchemy 엔진(Engine) 생성
-engine = create_engine(DATABASE_URL, echo=True)
+# echo(SQL 로그 출력)는 개발 환경에서만 켜고, 운영 환경에서는 끕니다.
+engine = create_engine(DATABASE_URL, echo=(ENVIRONMENT == "development"))
 
 # 3. 세션 팩토리(SessionFactory) 설정
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

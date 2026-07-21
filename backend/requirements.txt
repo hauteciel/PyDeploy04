@@ -5,3 +5,4 @@ SQLAlchemy==2.0.43
 PyMySQL==1.1.2
 python-dotenv==1.2.2
 python-multipart==0.0.21
+boto3==1.40.30
