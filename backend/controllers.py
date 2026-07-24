@@ -144,7 +144,10 @@ def download_file(file_id: int, db: Session = Depends(get_db)):
     # local: 서버에 저장된 파일을 직접 스트리밍
     # s3: 클라이언트를 S3 임시 서명 URL로 리다이렉트하여 서버를 거치지 않고 바로 다운로드
     if storage.STORAGE_BACKEND == "s3":
-        return RedirectResponse(url=storage.get_presigned_url(db_file.uploaded_name))
+        url = storage.get_presigned_url(
+            db_file.uploaded_name, download_name=db_file.original_name
+        )
+        return RedirectResponse(url=url)
 
     return FileResponse(
         path=storage.get_local_path(db_file.uploaded_name),

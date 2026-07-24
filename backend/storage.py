@@ -3,6 +3,7 @@
 # controllers.py는 이 모듈의 함수만 호출하면 되고, 백엔드가 어디서 도는지는 신경 쓸 필요가 없습니다.
 
 import os
+from urllib.parse import quote
 
 STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local")  # local | s3
 AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
@@ -47,10 +48,25 @@ def get_local_path(unique_filename: str) -> str:
     return os.path.join(UPLOAD_DIR, unique_filename)
 
 
-def get_presigned_url(unique_filename: str, expires_in: int = 300) -> str:
-    """s3 백엔드에서 다운로드/조회용 임시 서명 URL을 발급합니다."""
+def get_presigned_url(unique_filename: str, expires_in: int = 300, download_name: str | None = None) -> str:
+    """s3 백엔드에서 다운로드/조회용 임시 서명 URL을 발급합니다.
+
+    download_name을 지정하면, S3에 UUID로 저장된 실제 Key와 무관하게
+    브라우저가 해당 이름(예: 원본 파일명)으로 다운로드하도록 강제합니다.
+    """
+    params = {"Bucket": AWS_S3_BUCKET, "Key": unique_filename}
+
+    if download_name:
+        try:
+            download_name.encode("ascii")
+            content_disposition = f'attachment; filename="{download_name}"'
+        except UnicodeEncodeError:
+            # 한글 등 비-ASCII 파일명은 RFC 5987 형식(filename*)으로 인코딩
+            content_disposition = f"attachment; filename*=UTF-8''{quote(download_name)}"
+        params["ResponseContentDisposition"] = content_disposition
+
     return _s3_client.generate_presigned_url(
         "get_object",
-        Params={"Bucket": AWS_S3_BUCKET, "Key": unique_filename},
+        Params=params,
         ExpiresIn=expires_in,
     )

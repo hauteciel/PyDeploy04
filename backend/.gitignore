@@ -1,4 +1,5 @@
 .env
+.env.prod
 .idea
 .ipynb_checkpoints
 .mypy_cache
