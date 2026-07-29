@@ -19,7 +19,15 @@ DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB
 
 # 2. SQLAlchemy 엔진(Engine) 생성
 # echo(SQL 로그 출력)는 개발 환경에서만 켜고, 운영 환경에서는 끕니다.
-engine = create_engine(DATABASE_URL, echo=(ENVIRONMENT == "development"))
+# pool_pre_ping: 커넥션을 내주기 전 살아있는지 검사 후 죽어있으면 자동 재연결
+#   (RDS wait_timeout이나 네트워크 idle timeout으로 끊긴 커넥션을 오래 붙잡고 있다 실패하는 것 방지)
+# pool_recycle: 이 시간(초)이 지난 커넥션은 서버가 끊기 전에 선제적으로 재생성
+engine = create_engine(
+    DATABASE_URL,
+    echo=(ENVIRONMENT == "development"),
+    pool_pre_ping=True,
+    pool_recycle=1800,
+)
 
 # 3. 세션 팩토리(SessionFactory) 설정
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
